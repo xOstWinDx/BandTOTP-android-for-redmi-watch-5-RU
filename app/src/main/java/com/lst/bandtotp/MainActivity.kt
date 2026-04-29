@@ -4,9 +4,8 @@ import android.Manifest
 import android.content.ContentResolver
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -14,12 +13,31 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -29,333 +47,367 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import com.lst.bandtotp.ui.theme.BandtotpTheme
 import com.xiaomi.xms.wearable.Wearable
 import com.xiaomi.xms.wearable.auth.Permission
 import com.xiaomi.xms.wearable.node.Node
 import com.xiaomi.xms.wearable.node.NodeApi
 import kotlinx.coroutines.delay
+import org.json.JSONArray
+import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.InputStreamReader
 
-
 class MainActivity : ComponentActivity() {
+    private lateinit var nodeApi: NodeApi
+    private var nodeId: String? = null
+    private var curNode: Node? = null
 
-    private lateinit var nodeId: String
-    private lateinit var curNode:Node
-    private lateinit var nodeApi:NodeApi
-    private val handler = Handler(Looper.getMainLooper())
-    // 全局状态
-    private var logTextState = mutableStateOf("")
+    private val logTextState = mutableStateOf("")
+    private val connectedDeviceNameState = mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        nodeApi= Wearable.getNodeApi(this)
+        nodeApi = Wearable.getNodeApi(this)
         enableEdgeToEdge()
+
         setContent {
-            BandtotpTheme(){
+            BandtotpTheme {
                 MainContent()
             }
         }
     }
-    private fun openApp(){
-        nodeApi.isWearAppInstalled(nodeId)
-            .addOnSuccessListener { nodeApi.launchWearApp(nodeId, "pages/index").addOnSuccessListener {
-                //打开穿戴设备端应用成功
-                log("打开手环端软件成功")
-            }.addOnFailureListener {
-                log("打开手环端软件失败")
-                //sendMessageToWearable("{\"name\":\"microsoft\",\"key\":\"EP5O5BC3NZVEE7YI\",\"usr\":\"lesetong\"}".toByteArray())
-            }
-            }
-            .addOnFailureListener {
-                log("手环未安装小程序")
-                Toast.makeText(
-                    this,
-                    "手环未安装小程序！如果已经安装，请尝试重启手环",
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
-    }
 
-    //发送信息
-    private fun sendMessageToWearable(message: String) {
-        val messageApi = Wearable.getMessageApi(this)
-        if (::nodeId.isInitialized) {
-            messageApi.sendMessage(nodeId, message.toByteArray())
-                .addOnSuccessListener {
-                    Toast.makeText(this, "Message sent successfully", Toast.LENGTH_SHORT).show()
-                }
-                .addOnFailureListener { e ->
-                    Toast.makeText(this, "Failed to send message: ${e.message}", Toast.LENGTH_SHORT).show()
-                }
-        } else {
-            Toast.makeText(this, "No device connected", Toast.LENGTH_SHORT).show()
+    private fun tryOpenWearApp() {
+        val id = nodeId ?: run {
+            showToast(getString(R.string.toast_no_device))
+            return
         }
-    }
-    // 查询已连接的设备
-    private fun queryConnectedDevices() {
-        nodeApi.connectedNodes.addOnSuccessListener { nodes ->
-            if (nodes.isNotEmpty()) {
-                curNode = nodes[0]
-                nodeId = curNode.id
-                //connectedDeviceText.text =getString(R.string.connStat)+curNode.name
-                log(curNode.name)
-                checkAndRequestPermissions()
-            } else {
-                //connectedDeviceText.text =getString(R.string.connStat)+"None"
-            }
-        }.addOnFailureListener { e ->
-            Toast.makeText(
-                this,
-                "Failed to get connected devices: ${e.message}",
-                Toast.LENGTH_SHORT
-            ).show()
-        }
-    }
 
-    // 申请权限
-    private fun checkAndRequestPermissions() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH) != PackageManager.PERMISSION_GRANTED) {
-            // 请求蓝牙权限
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.BLUETOOTH), 1001)
-        }
-        val authApi = Wearable.getAuthApi(this)
-        if (::nodeId.isInitialized) {
-            val did =nodeId  // 填入你的设备 ID
-            authApi.checkPermission(did, Permission.DEVICE_MANAGER)
-                .addOnSuccessListener { granted ->
-                    if (!granted) {
-                        authApi.requestPermission(did, Permission.DEVICE_MANAGER)
-                            .addOnSuccessListener {
-                                log("Permissions granted")
-//                                listenForMessages()
-                            }.addOnFailureListener { e ->
-                                Toast.makeText(this, "Failed to request permissions: ${e.message}", Toast.LENGTH_SHORT).show()
-                            }
-                    } else {
-                        log("Permissions already granted")
-//                        listenForMessages()
+        nodeApi.isWearAppInstalled(id)
+            .addOnSuccessListener {
+                nodeApi.launchWearApp(id, "pages/index")
+                    .addOnSuccessListener {
+                        log(getString(R.string.log_wear_app_opened))
                     }
-                }.addOnFailureListener { e ->
-                    e.message?.let { log(it) }
-                }}
+                    .addOnFailureListener { error ->
+                        handleWearError(error, getString(R.string.log_wear_app_open_failed))
+                    }
+            }
+            .addOnFailureListener { error ->
+                handleWearError(error, getString(R.string.log_wear_app_check_failed))
+            }
     }
+
+    private fun sendAccountsToWearable(accounts: List<TotpInfo>) {
+        val id = nodeId ?: run {
+            showToast(getString(R.string.toast_no_device))
+            return
+        }
+        if (accounts.isEmpty()) {
+            showToast(getString(R.string.toast_no_accounts))
+            return
+        }
+
+        val payload = JSONObject()
+            .put("list", JSONArray(accounts.map { it.toJson() }))
+            .toString()
+
+        log(getString(R.string.log_send_started, accounts.size, payload.toByteArray(Charsets.UTF_8).size))
+        Wearable.getMessageApi(this)
+            .sendMessage(id, payload.toByteArray(Charsets.UTF_8))
+            .addOnSuccessListener {
+                val message = getString(R.string.toast_sent, accounts.size)
+                log(message)
+                showToast(message)
+            }
+            .addOnFailureListener { error ->
+                handleWearError(error, getString(R.string.toast_send_failed, error.message.orEmpty()))
+            }
+    }
+
+    private fun queryConnectedDevices() {
+        requestBluetoothPermissionsIfNeeded()
+
+        nodeApi.connectedNodes
+            .addOnSuccessListener { nodes ->
+                val node = nodes.firstOrNull()
+                if (node == null) {
+                    nodeId = null
+                    curNode = null
+                    connectedDeviceNameState.value = null
+                    return@addOnSuccessListener
+                }
+
+                val previousNodeId = nodeId
+                curNode = node
+                nodeId = node.id
+                connectedDeviceNameState.value = node.name
+
+                if (previousNodeId != node.id) {
+                    log(getString(R.string.log_device_found, node.name))
+                    checkAndRequestWearPermissions(node.id)
+                }
+            }
+            .addOnFailureListener { error ->
+                log(getString(R.string.log_device_query_failed, error.message.orEmpty()))
+            }
+    }
+
+    private fun requestBluetoothPermissionsIfNeeded() {
+        val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            arrayOf(
+                Manifest.permission.BLUETOOTH_CONNECT,
+                Manifest.permission.BLUETOOTH_SCAN
+            )
+        } else {
+            arrayOf(Manifest.permission.BLUETOOTH)
+        }
+
+        val missingPermissions = permissions.filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }
+
+        if (missingPermissions.isNotEmpty()) {
+            ActivityCompat.requestPermissions(this, missingPermissions.toTypedArray(), REQUEST_BLUETOOTH)
+        }
+    }
+
+    private fun checkAndRequestWearPermissions(id: String) {
+        val authApi = Wearable.getAuthApi(this)
+        authApi.checkPermission(id, Permission.DEVICE_MANAGER)
+            .addOnSuccessListener { granted ->
+                if (granted) {
+                    log(getString(R.string.log_permission_granted))
+                    return@addOnSuccessListener
+                }
+
+                authApi.requestPermission(id, Permission.DEVICE_MANAGER)
+                    .addOnSuccessListener {
+                        log(getString(R.string.log_permission_granted))
+                    }
+                    .addOnFailureListener { error ->
+                        handleWearError(error, getString(R.string.log_permission_failed, error.message.orEmpty()))
+                    }
+            }
+            .addOnFailureListener { error ->
+                handleWearError(error, getString(R.string.log_permission_check_failed, error.message.orEmpty()))
+            }
+    }
+
     @Composable
     fun MainContent(modifier: Modifier = Modifier) {
         val context = LocalContext.current
-        var connectedDeviceText by remember { mutableStateOf("设备未连接") }
-        var logText by remember { logTextState }
-        // 启动文件选择器
+        val connectedName by remember { connectedDeviceNameState }
+        val logText by remember { logTextState }
         val pickFileLauncher = rememberLauncherForActivityResult(
             contract = ActivityResultContracts.GetContent()
         ) { uri: Uri? ->
-            uri?.let {
-                // 通过 context 获取 contentResolver
-                val contentResolver = context.contentResolver
-                val datas=mutableListOf<Any>()
-                processFileLineByLine(contentResolver, it) { line ->
-                    var temp=parseTotpUri(line)
-                    temp?.let { it1 -> log(it1.name) }
-                    temp?.let { it1 -> datas.add(it1) }
+            if (uri == null) return@rememberLauncherForActivityResult
+
+            runCatching {
+                val text = readTextFromUri(context.contentResolver, uri)
+                TotpImportParser.parse(text)
+            }.onSuccess { accounts ->
+                if (accounts.isEmpty()) {
+                    log(getString(R.string.log_import_empty))
+                    showToast(getString(R.string.toast_no_accounts))
+                } else {
+                    log(getString(R.string.log_import_found, accounts.size))
+                    accounts.take(LOG_PREVIEW_COUNT).forEach {
+                        log(getString(R.string.log_import_account, it.name, it.usr))
+                    }
+                    sendAccountsToWearable(accounts)
                 }
-                sendMessageToWearable("{\"list\":${datas}}")
-                //log(datas)
-                //log(readTextFromUri(contentResolver, it))
+            }.onFailure { error ->
+                log(getString(R.string.log_import_failed, error.message.orEmpty()))
+                showToast(getString(R.string.toast_import_failed))
             }
-        }
-        fun startUpload(){
-            if(::nodeId.isInitialized) {
-                openApp()
-                pickFileLauncher.launch("text/plain")
-            }else{
-                Toast.makeText(this, "未连接到设备", Toast.LENGTH_SHORT).show()
-            }
-        }
-        LaunchedEffect(Unit) {
-            while (!(::nodeId.isInitialized)) {
-                // 更新文本
-                queryConnectedDevices()
-                // 延迟一段时间再更新
-                delay(1000) // 每秒更新一次
-            }
-            connectedDeviceText = "设备:${curNode.name}"
         }
 
-        Column(
+        fun startUpload() {
+            if (nodeId == null) {
+                showToast(getString(R.string.toast_no_device))
+                queryConnectedDevices()
+                return
+            }
+
+            tryOpenWearApp()
+            pickFileLauncher.launch("*/*")
+        }
+
+        LaunchedEffect(Unit) {
+            while (true) {
+                queryConnectedDevices()
+                delay(if (nodeId == null) 1_500 else 5_000)
+            }
+        }
+
+        Surface(
             modifier = modifier
+                .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
-                .fillMaxSize().systemBarsPadding()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 已连接设备信息卡片
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                elevation = CardDefaults.cardElevation(4.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface) // 使用主题颜色
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = connectedDeviceText,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                }
-            }
-            Button(
-                onClick = { startUpload() } ,
+            Column(
                 modifier = Modifier
-                        .fillMaxWidth()
-            ) {
-                Text("选择文本文档")
-            }
-            // 日志显示卡片
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(200.dp),
-                elevation = CardDefaults.cardElevation(4.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface) // 使用主题颜色
+                    .fillMaxSize()
+                    .systemBarsPadding()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp, vertical = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 Text(
-                    modifier = Modifier.padding(16.dp),
-                    text = "LOGS",
-                    fontSize = 20.sp,
+                    text = stringResource(R.string.app_name),
+                    style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer // 动态颜色
+                    color = MaterialTheme.colorScheme.onBackground
                 )
-                Column(modifier = Modifier
-                    .padding(16.dp)
-                    .verticalScroll(rememberScrollState())) {
-                    Text(
-                        text = logText,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                Text(
+                    text = stringResource(R.string.subtitle),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = stringResource(R.string.device_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = connectedName?.let { stringResource(R.string.status_device, it) }
+                                ?: stringResource(R.string.status_no_device),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
-            }
-            //关于
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(200.dp),
-                elevation = CardDefaults.cardElevation(4.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface) // 使用主题颜色
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "About",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer // 动态颜色
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "BandTOTP by lesetong\n本软件使用MIT协议开源\nCopyright (c) 2024 lesetong",
-                        fontSize = 16.sp,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer // 动态颜色
-                    )
+
+                Button(
+                    onClick = { startUpload() },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(stringResource(R.string.button_select_file))
+                }
+
+                OutlinedButton(
+                    onClick = { queryConnectedDevices() },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(stringResource(R.string.button_refresh_device))
+                }
+
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 220.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = stringResource(R.string.logs_title),
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        SelectionContainer {
+                            Text(
+                                text = logText.ifBlank { stringResource(R.string.logs_empty) },
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.heightIn(min = 120.dp, max = 280.dp)
+                            )
+                        }
+                    }
+                }
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = stringResource(R.string.about_title),
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = stringResource(R.string.about_text),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
         }
     }
+
     @Preview(showBackground = true)
     @Composable
-    fun GreetingPreview() {
-        BandtotpTheme(){
+    fun MainContentPreview() {
+        BandtotpTheme {
             MainContent()
         }
     }
-    // 方法用于添加日志
-    private fun log(message:Any) {
-        logTextState.value +="$message\n"
+
+    private fun handleWearError(error: Throwable, fallbackMessage: String) {
+        if (error.isSignatureFailure()) {
+            val message = getString(R.string.log_signature_failed)
+            log(message)
+            showToast(message)
+            return
+        }
+
+        log(fallbackMessage)
+        if (fallbackMessage.isNotBlank()) {
+            showToast(fallbackMessage)
+        }
     }
+
+    private fun log(message: Any) {
+        val next = "${logTextState.value}$message\n"
+        logTextState.value = if (next.length > MAX_LOG_CHARS) {
+            next.takeLast(MAX_LOG_CHARS)
+        } else {
+            next
+        }
+    }
+
     private fun readTextFromUri(contentResolver: ContentResolver, uri: Uri): String {
         val stringBuilder = StringBuilder()
         contentResolver.openInputStream(uri)?.use { inputStream ->
-            BufferedReader(InputStreamReader(inputStream)).use { reader ->
+            BufferedReader(InputStreamReader(inputStream, Charsets.UTF_8)).use { reader ->
                 var line: String?
                 while (reader.readLine().also { line = it } != null) {
-                    stringBuilder.append(line).append("\n")
+                    stringBuilder.append(line).append('\n')
                 }
             }
         }
         return stringBuilder.toString()
     }
 
-    private data class TOTPInfo(
-        val name: String,//issuer
-        val usr: String,//account
-        val key: String,//secret
-        val algorithm: String = "SHA1",
-        val digits: Int = 6,
-        val period: Int = 30
-    ){
-        override fun toString(): String {
-            return """{
-            "name": "$name",
-            "usr": "$usr",
-            "key": "$key",
-            "algorithm": "$algorithm",
-            "digits": $digits,
-            "period": $period
-        }""".trimIndent()
-        }}
-
-    private fun parseTotpUri(totpUri: String): TOTPInfo? {
-        try {
-            val uri = Uri.parse(totpUri)
-
-            // 检查URI的scheme是否是otpauth以及是否是totp类型
-            if (uri.scheme != "otpauth" || uri.host != "totp") {
-                return null
-            }
-
-            // 从路径中提取 issuer 和 account
-            val path = uri.path ?: return null
-            val splitPath = path.split(":")
-            if (splitPath.size != 2) {
-                return null
-            }
-
-            val issuerFromPath = splitPath[0].trim('/')
-            val account = splitPath[1]
-
-            // 从查询参数中获取 secret 和其他可选参数
-            val secret = uri.getQueryParameter("secret") ?: return null
-            val issuerFromQuery = uri.getQueryParameter("issuer") ?: issuerFromPath
-            val algorithm = uri.getQueryParameter("algorithm") ?: "SHA1"
-            val digits = uri.getQueryParameter("digits")?.toIntOrNull() ?: 6
-            val period = uri.getQueryParameter("period")?.toIntOrNull() ?: 30
-
-            // 返回解析后的 TOTP 信息
-            return TOTPInfo(
-                name = issuerFromQuery,
-                usr = account,
-                key = secret,
-                algorithm = algorithm,
-                digits = digits,
-                period = period
-            )
-        } catch (e: Exception) {
-            e.printStackTrace()
-            return null
-        }
+    private fun showToast(message: String) {
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
-    private fun processFileLineByLine(contentResolver: ContentResolver, uri: Uri, processLine: (String) -> Unit) {
-        contentResolver.openInputStream(uri)?.use { inputStream ->
-            BufferedReader(InputStreamReader(inputStream)).use { reader ->
-                var line: String?
-                while (reader.readLine().also { line = it } != null) {
-                    // 对每一行进行处理
-                    processLine(line!!)
-                }
-            }
-        }
+
+    private fun Throwable.isSignatureFailure(): Boolean {
+        val className = this::class.java.simpleName
+        val text = "${message.orEmpty()} $className".lowercase()
+        return "signature" in text || "fingerprint" in text
+    }
+
+    companion object {
+        private const val REQUEST_BLUETOOTH = 1001
+        private const val MAX_LOG_CHARS = 8_000
+        private const val LOG_PREVIEW_COUNT = 6
     }
 }
-
-
-

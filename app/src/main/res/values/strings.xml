@@ -1,4 +1,32 @@
 <resources>
-    <string name="app_name">BandTOTP</string>
-    <string name="about">about</string>
+    <string name="app_name">BandTOTP RU</string>
+    <string name="subtitle">Импорт TOTP-ключей на часы Xiaomi/Redmi с HyperOS.</string>
+    <string name="device_title">Подключение</string>
+    <string name="status_no_device">Часы не подключены</string>
+    <string name="status_device">Часы: %1$s</string>
+    <string name="button_select_file">Выбрать файл и отправить</string>
+    <string name="button_refresh_device">Обновить подключение</string>
+    <string name="logs_title">Журнал</string>
+    <string name="logs_empty">Пока пусто. Подключите часы и выберите файл с ключами.</string>
+    <string name="about_title">О приложении</string>
+    <string name="about_text">BandTOTP RU основан на BandTOTP by lesetong.\nОткрытый исходный код, лицензия MIT.\nИмпорт поддерживает otpauth-ссылки, JSON-списки и декодированный экспорт Google Authenticator.</string>
+    <string name="toast_no_device">Часы не подключены</string>
+    <string name="toast_no_accounts">В файле не найдено TOTP-ключей</string>
+    <string name="toast_import_failed">Не удалось прочитать файл</string>
+    <string name="toast_sent">Отправлено записей: %1$d</string>
+    <string name="toast_send_failed">Не удалось отправить данные: %1$s</string>
+    <string name="log_device_found">Найдены часы: %1$s</string>
+    <string name="log_device_query_failed">Не удалось получить список устройств: %1$s</string>
+    <string name="log_permission_granted">Разрешение для часов получено</string>
+    <string name="log_permission_failed">Не удалось запросить разрешение часов: %1$s</string>
+    <string name="log_permission_check_failed">Не удалось проверить разрешение часов: %1$s</string>
+    <string name="log_wear_app_opened">Приложение на часах открыто</string>
+    <string name="log_wear_app_open_failed">Не удалось открыть приложение на часах</string>
+    <string name="log_wear_app_check_failed">Не удалось проверить приложение на часах</string>
+    <string name="log_signature_failed">XMS отклонил подпись: установите APK и RPK, собранные одним сертификатом</string>
+    <string name="log_import_found">Найдено TOTP-записей: %1$d</string>
+    <string name="log_import_empty">Импорт завершен, но TOTP-записи не найдены</string>
+    <string name="log_import_failed">Ошибка импорта: %1$s</string>
+    <string name="log_import_account">%1$s: %2$s</string>
+    <string name="log_send_started">Отправка: %1$d записей, %2$d байт</string>
 </resources>
