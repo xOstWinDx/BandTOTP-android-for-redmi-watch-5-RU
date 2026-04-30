@@ -26,15 +26,19 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -45,6 +49,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -56,8 +62,6 @@ import com.xiaomi.xms.wearable.auth.Permission
 import com.xiaomi.xms.wearable.node.Node
 import com.xiaomi.xms.wearable.node.NodeApi
 import kotlinx.coroutines.delay
-import org.json.JSONArray
-import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.InputStreamReader
 
@@ -102,7 +106,7 @@ class MainActivity : ComponentActivity() {
             }
     }
 
-    private fun sendAccountsToWearable(accounts: List<TotpInfo>) {
+    private fun sendEncryptedVaultToWearable(accounts: List<TotpInfo>, pin: String) {
         val id = nodeId ?: run {
             showToast(getString(R.string.toast_no_device))
             return
@@ -112,9 +116,12 @@ class MainActivity : ComponentActivity() {
             return
         }
 
-        val payload = JSONObject()
-            .put("list", JSONArray(accounts.map { it.toJson() }))
-            .toString()
+        val payload = runCatching {
+            VaultCrypto.buildPayload(accounts, pin).toString()
+        }.onFailure { error ->
+            log(getString(R.string.log_vault_encrypt_failed, error.message.orEmpty()))
+            showToast(getString(R.string.toast_vault_encrypt_failed))
+        }.getOrNull() ?: return
 
         log(getString(R.string.log_send_started, accounts.size, payload.toByteArray(Charsets.UTF_8).size))
         Wearable.getMessageApi(this)
@@ -203,6 +210,9 @@ class MainActivity : ComponentActivity() {
         val context = LocalContext.current
         val connectedName by remember { connectedDeviceNameState }
         val logText by remember { logTextState }
+        var pendingAccounts by remember { mutableStateOf<List<TotpInfo>>(emptyList()) }
+        var vaultPin by remember { mutableStateOf("") }
+        var showPinDialog by remember { mutableStateOf(false) }
         val pickFileLauncher = rememberLauncherForActivityResult(
             contract = ActivityResultContracts.GetContent()
         ) { uri: Uri? ->
@@ -220,7 +230,9 @@ class MainActivity : ComponentActivity() {
                     accounts.take(LOG_PREVIEW_COUNT).forEach {
                         log(getString(R.string.log_import_account, it.name, it.usr))
                     }
-                    sendAccountsToWearable(accounts)
+                    pendingAccounts = accounts
+                    vaultPin = ""
+                    showPinDialog = true
                 }
             }.onFailure { error ->
                 log(getString(R.string.log_import_failed, error.message.orEmpty()))
@@ -269,6 +281,64 @@ class MainActivity : ComponentActivity() {
 
             tryOpenWearApp()
             openSecureFilePicker()
+        }
+
+        if (showPinDialog) {
+            AlertDialog(
+                onDismissRequest = {
+                    showPinDialog = false
+                    vaultPin = ""
+                    pendingAccounts = emptyList()
+                },
+                title = { Text(stringResource(R.string.pin_dialog_title)) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(
+                            text = stringResource(R.string.pin_dialog_text),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        OutlinedTextField(
+                            value = vaultPin,
+                            onValueChange = { value ->
+                                vaultPin = value.filter(Char::isDigit).take(12)
+                            },
+                            label = { Text(stringResource(R.string.pin_dialog_label)) },
+                            singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            if (vaultPin.length < 4) {
+                                showToast(getString(R.string.toast_pin_short))
+                                return@TextButton
+                            }
+
+                            sendEncryptedVaultToWearable(pendingAccounts, vaultPin)
+                            showPinDialog = false
+                            vaultPin = ""
+                            pendingAccounts = emptyList()
+                        }
+                    ) {
+                        Text(stringResource(R.string.pin_dialog_confirm))
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = {
+                            showPinDialog = false
+                            vaultPin = ""
+                            pendingAccounts = emptyList()
+                        }
+                    ) {
+                        Text(stringResource(R.string.pin_dialog_cancel))
+                    }
+                }
+            )
         }
 
         LaunchedEffect(Unit) {

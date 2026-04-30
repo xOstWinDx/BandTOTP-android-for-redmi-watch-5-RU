@@ -1,22 +1,24 @@
 <resources>
     <string name="app_name">BandTOTP RU</string>
-    <string name="subtitle">Импорт TOTP-ключей на часы Xiaomi/Redmi с HyperOS.</string>
+    <string name="subtitle">Шифрованный импорт TOTP-ключей на часы Xiaomi/Redmi с HyperOS.</string>
     <string name="device_title">Подключение</string>
     <string name="status_no_device">Часы не подключены</string>
     <string name="status_device">Часы: %1$s</string>
-    <string name="button_select_file">Выбрать файл и отправить</string>
+    <string name="button_select_file">Выбрать файл и зашифровать</string>
     <string name="button_refresh_device">Обновить подключение</string>
     <string name="logs_title">Журнал</string>
     <string name="logs_empty">Пока пусто. Подключите часы и выберите файл с ключами.</string>
     <string name="about_title">О приложении</string>
-    <string name="about_text">BandTOTP RU основан на BandTOTP by lesetong.\nОткрытый исходный код, лицензия MIT.\nИмпорт поддерживает otpauth-ссылки, JSON-списки и декодированный экспорт Google Authenticator.</string>
+    <string name="about_text">BandTOTP RU основан на BandTOTP by lesetong.\nОткрытый исходный код, лицензия MIT.\nИмпорт поддерживает otpauth-ссылки, JSON-списки и декодированный экспорт Google Authenticator.\nПеред отправкой список шифруется PIN-кодом, который вводится на часах.</string>
     <string name="toast_no_device">Часы не подключены</string>
     <string name="toast_no_accounts">В файле не найдено TOTP-ключей</string>
     <string name="toast_import_failed">Не удалось прочитать файл</string>
     <string name="toast_device_unlock_required">Импорт отменен: нужна разблокировка телефона</string>
     <string name="toast_device_lock_missing">Сначала включите PIN, пароль или биометрию на телефоне</string>
-    <string name="toast_sent">Отправлено записей: %1$d</string>
+    <string name="toast_sent">Отправлено зашифрованных записей: %1$d</string>
     <string name="toast_send_failed">Не удалось отправить данные: %1$s</string>
+    <string name="toast_pin_short">PIN должен быть минимум 4 цифры</string>
+    <string name="toast_vault_encrypt_failed">Не удалось зашифровать хранилище</string>
     <string name="log_device_found">Найдены часы: %1$s</string>
     <string name="log_device_query_failed">Не удалось получить список устройств: %1$s</string>
     <string name="log_permission_granted">Разрешение для часов получено</string>
@@ -31,10 +33,16 @@
     <string name="log_import_failed">Ошибка импорта: %1$s</string>
     <string name="log_import_account">%1$s: %2$s</string>
     <string name="log_send_started">Отправка: %1$d записей, %2$d байт</string>
+    <string name="log_vault_encrypt_failed">Ошибка шифрования: %1$s</string>
     <string name="log_device_unlocked">Телефон разблокирован, можно выбрать файл</string>
     <string name="log_device_unlock_cancelled">Разблокировка телефона отменена</string>
     <string name="log_device_lock_missing">На телефоне не включена системная блокировка</string>
     <string name="log_device_unlock_unavailable">Системная разблокировка недоступна</string>
     <string name="unlock_title">Подтвердите импорт</string>
     <string name="unlock_description">Разблокируйте телефон перед отправкой TOTP-ключей на часы.</string>
+    <string name="pin_dialog_title">PIN для часов</string>
+    <string name="pin_dialog_text">Введите PIN, которым часы будут расшифровывать TOTP-хранилище. Если PIN забыть, хранилище на часах придется сбросить и импортировать заново.</string>
+    <string name="pin_dialog_label">PIN</string>
+    <string name="pin_dialog_confirm">Зашифровать и отправить</string>
+    <string name="pin_dialog_cancel">Отмена</string>
 </resources>
