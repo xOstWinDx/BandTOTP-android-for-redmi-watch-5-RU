@@ -22,14 +22,15 @@ class VaultCryptoTest {
         val vault = payload.getJSONObject("vault")
         val text = payload.toString()
 
-        assertEquals(1, vault.getInt("version"))
-        assertEquals("PBKDF2-SHA256", vault.getString("kdf"))
-        assertTrue(vault.getInt("iterations") > 0)
+        assertEquals(5, vault.getInt("version"))
+        assertEquals("PIN-MIX-XOR-32", vault.getString("kdf"))
         assertTrue(vault.getString("salt").isNotBlank())
-        assertTrue(vault.getString("iv").isNotBlank())
         assertTrue(vault.getString("ciphertext").isNotBlank())
-        assertEquals(64, vault.getString("mac").length)
         assertEquals("GitHub", payload.getJSONArray("meta").getJSONObject(0).getString("name"))
         assertFalse(text.contains("JBSWY3DPEHPK3PXP"))
+
+        val decrypted = VaultCrypto.decryptPayloadForTest(vault, "1234")
+        val account = decrypted.getJSONArray("list").getJSONObject(0)
+        assertEquals("JBSWY3DPEHPK3PXP", account.getString("key"))
     }
 }
