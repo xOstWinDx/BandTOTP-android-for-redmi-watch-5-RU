@@ -13,6 +13,8 @@
     <string name="toast_no_device">Часы не подключены</string>
     <string name="toast_no_accounts">В файле не найдено TOTP-ключей</string>
     <string name="toast_import_failed">Не удалось прочитать файл</string>
+    <string name="toast_device_unlock_required">Импорт отменен: нужна разблокировка телефона</string>
+    <string name="toast_device_lock_missing">Сначала включите PIN, пароль или биометрию на телефоне</string>
     <string name="toast_sent">Отправлено записей: %1$d</string>
     <string name="toast_send_failed">Не удалось отправить данные: %1$s</string>
     <string name="log_device_found">Найдены часы: %1$s</string>
@@ -29,4 +31,10 @@
     <string name="log_import_failed">Ошибка импорта: %1$s</string>
     <string name="log_import_account">%1$s: %2$s</string>
     <string name="log_send_started">Отправка: %1$d записей, %2$d байт</string>
+    <string name="log_device_unlocked">Телефон разблокирован, можно выбрать файл</string>
+    <string name="log_device_unlock_cancelled">Разблокировка телефона отменена</string>
+    <string name="log_device_lock_missing">На телефоне не включена системная блокировка</string>
+    <string name="log_device_unlock_unavailable">Системная разблокировка недоступна</string>
+    <string name="unlock_title">Подтвердите импорт</string>
+    <string name="unlock_description">Разблокируйте телефон перед отправкой TOTP-ключей на часы.</string>
 </resources>

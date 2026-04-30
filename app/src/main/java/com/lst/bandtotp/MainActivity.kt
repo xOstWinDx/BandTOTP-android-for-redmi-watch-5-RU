@@ -1,7 +1,10 @@
 package com.lst.bandtotp
 
 import android.Manifest
+import android.app.Activity
+import android.app.KeyguardManager
 import android.content.ContentResolver
+import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -224,6 +227,38 @@ class MainActivity : ComponentActivity() {
                 showToast(getString(R.string.toast_import_failed))
             }
         }
+        val unlockLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.StartActivityForResult()
+        ) { result ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                log(getString(R.string.log_device_unlocked))
+                pickFileLauncher.launch("*/*")
+            } else {
+                log(getString(R.string.log_device_unlock_cancelled))
+                showToast(getString(R.string.toast_device_unlock_required))
+            }
+        }
+
+        fun openSecureFilePicker() {
+            val keyguard = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+            if (!keyguard.isDeviceSecure) {
+                log(getString(R.string.log_device_lock_missing))
+                showToast(getString(R.string.toast_device_lock_missing))
+                return
+            }
+
+            val intent = keyguard.createConfirmDeviceCredentialIntent(
+                getString(R.string.unlock_title),
+                getString(R.string.unlock_description)
+            )
+            if (intent == null) {
+                log(getString(R.string.log_device_unlock_unavailable))
+                showToast(getString(R.string.toast_device_unlock_required))
+                return
+            }
+
+            unlockLauncher.launch(intent)
+        }
 
         fun startUpload() {
             if (nodeId == null) {
@@ -233,7 +268,7 @@ class MainActivity : ComponentActivity() {
             }
 
             tryOpenWearApp()
-            pickFileLauncher.launch("*/*")
+            openSecureFilePicker()
         }
 
         LaunchedEffect(Unit) {
